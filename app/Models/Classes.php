@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Symfony\Component\HttpFoundation\Session\Flash\FlashBag;
 
 class Classes extends Model
 {
@@ -18,12 +17,22 @@ class Classes extends Model
     protected $fillable = [
         'class_id',
         'class_name',
-        'teacher_name'
+        'user_id', // foreign key to users table (teacher)
     ];
 
-    // Relationship: One class has many students
-    public function students(){
-        return $this->hasMany(StudentList::class, 'class_id');
+    /**
+     * Relationship: A class belongs to one teacher (user)
+     */
+    public function teacher()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
+    /**
+     * Relationship: One class has many students
+     */
+    public function students()
+    {
+        return $this->hasMany(StudentList::class, 'class_id', 'class_id');
+    }
 }

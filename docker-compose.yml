@@ -1,0 +1,71 @@
+# version: "3.8"
+
+# services:
+#   app:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#     container_name: laravel_app
+#     ports:
+#       - "8000:8000"
+#     volumes:
+#       - .:/app
+#     environment:
+#       DB_CONNECTION: pgsql
+#       DB_HOST: postgres
+#       DB_PORT: 5432
+#       DB_DATABASE: student_management
+#       DB_USERNAME: segp13
+#       DB_PASSWORD: 123456
+#     command: php artisan serve --host=0.0.0.0 --port=8000   # <-- ADD THIS
+#     depends_on:
+#       - postgres
+
+
+#   postgres:
+#     image: postgres:15
+#     container_name: laravel_postgres
+#     environment:
+#       POSTGRES_DB: student_management
+#       POSTGRES_USER: segp13
+#       POSTGRES_PASSWORD: 123456
+#     ports:
+#       - "5432:5432"
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+
+# volumes:
+#   postgres_data:
+
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - postgres
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+  postgres:
+    image: postgres:15
+    container_name: laravel_postgres
+    environment:
+      POSTGRES_DB: student_management
+      POSTGRES_USER: segp13
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+

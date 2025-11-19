@@ -55,4 +55,37 @@ class AttendenceController extends Controller
         'data' => $attendance
     ]);
 }
+
+public function index()
+{
+    $attendance = Attendence::with('student')
+        ->get()
+        ->groupBy('student_id')
+        ->map(function ($records) {
+            $summary = [
+                'Present' => $records->where('status', 'Present')->count(),
+                'Absent' => $records->where('status', 'Absent')->count(),
+                'Late' => $records->where('status', 'Late')->count(),
+            ];
+
+            return [
+                'student_id' => $records->first()->student_id,
+                'student_name' => $records->first()->student->student_name ?? null,
+                'gender' => $records->first()->student->gender ?? null,
+                'summary' => $summary,
+                'class_id' => $records->first()->student->class_id ?? null,
+                'data' => $records->map(function ($record) {
+                    return [
+                        'date' => $record->created_at->toDateString(),
+                        'status' => $record->status,
+                    ];
+                })->values(),
+            ];
+        })
+        ->values(); // reset keys
+
+    return response()->json($attendance, 200);
+}
+
+
 }

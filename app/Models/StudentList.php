@@ -17,7 +17,7 @@ class StudentList extends Model
     protected $fillable = ['student_id', 'student_name', 'gender', 'email', 'class_id'];
 
     // Relationship: Each student belongs to one class
-    public function class()
+    public function classes()
     {
         return $this->belongsTo(Classes::class, 'class_id');
     }

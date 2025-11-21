@@ -8,41 +8,80 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Exceptions\JWTException;
+use Illuminate\Support\Facades\Mail;
+use App\Models\EmailOtp;
 
 class AuthController extends Controller
 {
+   // Step 1: Send OTP to email
+    public function sendOtp(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|unique:users,email'
+        ]);
+
+        $otp = rand(100000, 999999);
+
+        // Save OTP in table (no user created yet)
+        EmailOtp::updateOrCreate(
+            ['email' => $request->email], // You can store OTP by email instead of user_id
+            [
+                'otp' => $otp,
+                'expires_at' => now()->addMinutes(10)
+            ]
+        );
+
+        Mail::raw("Your verification code is: $otp", function ($message) use ($request) {
+            $message->to($request->email)
+                ->subject('Email Verification Code');
+        });
+
+        return response()->json([
+            'message' => 'OTP sent to email'
+        ],200);
+    }
+
+    // Step 2: Verify OTP and Register
     public function register(Request $request)
     {
-        try {
-            $request->validate([
-                "name" => "required|string",
-                "email" => "required|email|unique:users,email",
-                "password" => "required|string|min:6"
-            ]);
+        $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
+            'otp' => 'required'
+        ]);
 
-            $user = User::create([
-                "name" => $request->name,
-                "email" => $request->email,
-                "password" => Hash::make($request->password)
-            ]);
+        // Check OTP
+        $otpRecord = EmailOtp::where('email', $request->email)
+            ->where('otp', $request->otp)
+            ->where('expires_at', '>=', now())
+            ->first();
 
-            if (!$user) {
-                return response()->json(["error" => "User creation failed"], 500);
-            }
-
-            // Optional: Automatically login after registration
-            $token = JWTAuth::fromUser($user);
-
+        if (!$otpRecord) {
             return response()->json([
-                "message" => "User created successfully",
-                "user" => $user,
-                "token" => $token
-            ], 201);
+                'message' => 'Invalid or expired OTP'
+            ], 400);
+        }
 
-        } catch (\Exception $e) {
-    return response()->json(['error' => $e->getMessage()], 500);
-}
+        // Create user after OTP verified
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+            'email_verified_at' => now()
+        ]);
 
+        // Delete OTP after verification
+        $otpRecord->delete();
+
+        // Optionally login user automatically
+        $token = JWTAuth::fromUser($user);
+
+        return response()->json([
+            'message' => 'User registered and email verified successfully',
+            'user' => $user,
+            'token' => $token
+        ], 201);
     }
 
     public function login(Request $request)

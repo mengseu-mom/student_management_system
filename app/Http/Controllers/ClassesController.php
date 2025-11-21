@@ -41,19 +41,16 @@ class ClassesController extends Controller
      * Display the specified resource.
      */
     public function show(string $class_id)
-    {
-        $classes = Classes::with('teacher')->find($class_id);
+{
+    $classes = Classes::with('teacher', 'students')->find($class_id);
 
-        if (!$classes) {
-            return response()->json([
-                'message' => 'Class not found!'
-            ], 404);
-        }
-
-        return response()->json([
-            'data' => $classes
-        ], 200);
+    if (!$classes) {
+        return response()->json(['message' => 'Class not found!'], 404);
     }
+
+    return response()->json(['data' => $classes], 200);
+}
+
 
     /**
      * Update the specified resource in storage.

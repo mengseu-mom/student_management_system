@@ -3,89 +3,118 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendence;
+use App\Models\Classes;
+use App\Models\StudentList;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AttendenceController extends Controller
 {
-    public function store(Request $request){
-        $validated = $request->validate([
-            'student_id' => 'required|exists:student_lists,student_id',
-            "date" => "required|date",
-            'status' => 'required|in:Present,Absent,Late',
-        ]);
+    public function store(Request $request)
+    {
 
-        // $students_id = Attendence::where('student_id',$student_id)->find();
+        $user = JWTAuth::parseToken()->authenticate();
+        $students = $request->all();
+        $created = [];
 
-     
+        foreach ($students as $student) {
+            // Validate each student
+            $validated = Validator::make($student, [
+                'student_id' => 'required|exists:student_lists,student_id',
+                'date' => 'required|date',
+                'status' => 'required|in:Present,P,Absent',
+            ])->validate();
+
+            $validated['user_id'] = $user->id;
+            // Create attendance
             $attendance = Attendence::create($validated);
-        
-
-        $total = Attendence::where('student_id',$request->student_id)->count();
+            $created[] = $attendance;
+        }
 
         return response()->json([
-            'message' => 'Attendance create successfully.',
-            'total' => $total,
+            'message' => 'Attendance created successfully for all students.',
+            'data' => $created,
+            'total' => count($created)
+        ]);
+    }
+
+    public function show()
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+
+        // Get student ID based on authenticated user
+        $student_id = $user->id;
+
+        // Fetch attendance records for this student
+        $attendance = Attendence::where('student_id', $student_id)
+            ->orderBy('created_at', 'asc')
+            ->get([
+                'id',
+                'student_id',
+                'class_id',
+                'status',
+                'created_at'
+            ]);
+
+        if ($attendance->isEmpty()) {
+            return response()->json(['message' => 'No attendance records found'], 404);
+        }
+
+        // Summary counts
+        $totalPresent = $attendance->where('status', 'Present')->count();
+        $totalAbsent  = $attendance->where('status', 'Absent')->count();
+        $totalP       = $attendance->where('status', 'P')->count();
+
+        return response()->json([
+            'student_id'    => $student_id,
+            'total_records' => $attendance->count(),
+            'summary' => [
+                'Present' => $totalPresent,
+                'Absent'  => $totalAbsent,
+                'P'       => $totalP,
+            ],
             'data' => $attendance
         ]);
     }
 
-     public function show(string $student_id)
-{
-    // Get all attendance records for this student
-    $attendance = Attendence::where('student_id', $student_id)->get();
+    public function allAttendance()
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+        $classIds = Classes::where('user_id', $user->id)->pluck('class_id');
 
-    if ($attendance->isEmpty()) {
-        return response()->json(['message' => 'No attendance records found for this student'], 404);
-    }
+        // Get all students for these classes + their attendance
+        $students = StudentList::with('attendance')
+            ->whereIn('class_id', $classIds)
+            ->get();
 
-    // Count totals for each status
-    $totalPresent = $attendance->where('status', 'Present')->count();
-    $totalAbsent  = $attendance->where('status', 'Absent')->count();
-    $totalLate    = $attendance->where('status', 'Late')->count();
+        $result = $students->map(function ($student) {
 
-    // Return full summary
-    return response()->json([
-        'student_id' => $student_id,
-        'total_records' => $attendance->count(),
-        'summary' => [
-            'Present' => $totalPresent,
-            'Absent'  => $totalAbsent,
-            'Late'    => $totalLate,
-        ],
-        'data' => $attendance
-    ]);
-}
+            // All attendance records for this student
+            $records = $student->attendance;
 
-public function index()
-{
-    $attendance = Attendence::with('student')
-        ->get()
-        ->groupBy('student_id')
-        ->map(function ($records) {
+            // Summary
             $summary = [
                 'Present' => $records->where('status', 'Present')->count(),
-                'Absent' => $records->where('status', 'Absent')->count(),
-                'Late' => $records->where('status', 'Late')->count(),
+                'P'    => $records->where('status', 'P')->count(),
+                'Absent'  => $records->where('status', 'Absent')->count(),
             ];
 
             return [
-                'student_id' => $records->first()->student_id,
-                'student_name' => $records->first()->student->student_name ?? null,
-                'gender' => $records->first()->student->gender ?? null,
-                'summary' => $summary,
-                'class_id' => $records->first()->student->class_id ?? null,
+                'student_id'   => $student->student_id,
+                'student_name' => $student->student_name,
+                'gender'       => $student->gender,
+                'class_id'     => $student->class_id,
+                'summary'      => $summary,
                 'data' => $records->map(function ($record) {
                     return [
-                        'date' => $record->created_at->toDateString(),
+                        'date'   => $record->created_at->toDateString(),
                         'status' => $record->status,
                     ];
                 })->values(),
             ];
-        })
-        ->values(); // reset keys
+        });
 
-    return response()->json($attendance, 200);
-}
-
-
+        return response()->json($result, 200);
+    }
 }

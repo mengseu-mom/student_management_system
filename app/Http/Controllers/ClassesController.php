@@ -3,31 +3,32 @@
 namespace App\Http\Controllers;
 
 use App\Models\Classes;
+use App\Models\StudentList;
 use Illuminate\Http\Request;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class ClassesController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        $classes = Classes::with('teacher','students')->get(); // include teacher if related
-        return response()->json([
-            'data' => $classes
-        ], 200);
-    }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
+        $user = JWTAuth::parseToken()->authenticate();
+
+        // Check how many classes this user already has
+        $count = Classes::where('user_id', $user->id)->count();
+        if ($count >= 8) {
+            return response()->json([
+                'message' => 'You can only create up to 8 classes.'
+            ]);
+        }
+
         $validated = $request->validate([
             "class_id" => "required|string|max:25|unique:classes,class_id",
             "class_name" => "required|string|max:50",
-            "user_id" => "required"
+            "status" => "required|boolean",
         ]);
+
+        $validated['user_id'] = $user->id;
 
         $classes = Classes::create($validated);
 
@@ -37,19 +38,43 @@ class ClassesController extends Controller
         ], 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $class_id)
-{
-    $classes = Classes::with('teacher', 'students')->find($class_id);
 
-    if (!$classes) {
-        return response()->json(['message' => 'Class not found!'], 404);
+    public function getByUser()
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+        $classes = Classes::with('teacher', 'students')->where('user_id', $user->id)->get();
+        return response()->json([
+            "message " => "success",
+            "data" => $classes
+        ], 200);
     }
 
-    return response()->json(['data' => $classes], 200);
+    public function getByClass($class_id)
+{
+    $userId = auth('api')->id();
+    // 1. Check if class exists AND belongs to this user
+    $class = Classes::where('class_id', $class_id)
+        ->where('user_id', $userId)
+        ->with('students')
+        ->first();
+
+    if (!$class) {
+        return response()->json([
+            "message" => "Class not found or not owned by user"
+        ], 404);
+    }
+
+    // Class belongs to user — return it
+    return response()->json([
+        "message" => "success",
+        "class" => [
+            "class_id" => $class->class_id,
+            "class_name" => $class->class_name,
+        ],
+        "students" => $class->students   // can be empty []
+    ], 200);
 }
+
 
 
     /**

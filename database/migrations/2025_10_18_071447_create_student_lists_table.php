@@ -12,10 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('student_lists', function (Blueprint $table) {
+            $table->bigIncrements('id');
             $table->string("student_id")->primary();
             $table->string("student_name");
             $table->string("gender")->nullable();
             $table->string("email")->nullable();
+            $table->string("parent_contact")->nullable();
             $table->string('class_id');
             $table->foreign('class_id')->references('class_id')->on('classes')->onDelete('cascade');
             $table->timestamps();

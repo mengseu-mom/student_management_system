@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('classes', function (Blueprint $table) {
             $table->string('class_id')->primary(); // make it primary instead of unique
             $table->string('class_name')->nullable();
+            $table->boolean('status');
             $table->unsignedBigInteger('user_id'); // foreign key to users table
             $table->timestamps();
 

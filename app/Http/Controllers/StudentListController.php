@@ -4,101 +4,82 @@ namespace App\Http\Controllers;
 
 use App\Models\Classes;
 use App\Models\StudentList;
+use Illuminate\Auth\Events\Validated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class StudentListController extends Controller
 {
     /**
      * List all students (Admin) or all students for the teacher (if user_id provided)
      */
-    public function index(Request $request)
+    public function index()
     {
-        $user_id = $request->query('user_id'); // optional query param
+        $user = JWTAuth::parseToken()->authenticate();
 
-        if ($user_id) {
-            // Get classes for the teacher
-            $classes = Classes::with('students')->where('user_id', $user_id)->get();
+        // Get classes for logged-in teacher
+        $classes = Classes::with('students')->where('user_id', $user->id)->get();
 
-            // Flatten all students into one array
-            $students = $classes->flatMap(function ($class) {
-                return $class->students;
-            });
+        $students = $classes->flatMap(fn($class) => $class->students);
 
-            return response()->json([
-                'success' => true,
-                'data' => $students
-            ], 200);
-        }
-
-        // Return all students (admin)
         return response()->json([
             'success' => true,
-            'data' => StudentList::all()
+            'data' => $students
         ], 200);
     }
 
     /**
      * Get students by teacher ID
      */
-    public function getByTeacher($user_id)
+    public function getByTeacher()
     {
-        $classes = Classes::with('students')->where('user_id', $user_id)->get();
-        $students = $classes->flatMap(function ($class) {
-            return $class->students;
-        });
+        $user = JWTAuth::parseToken()->authenticate();
+
+        $classes = Classes::with('students')->where('user_id', $user->id)->get();
+
+        $students = $classes->flatMap(fn($class) => $class->students);
 
         return response()->json([
             'success' => true,
             'data' => $students
-        ]);
+        ], 200);
     }
 
-    /**
-     * Store a new student (only in teacher's classes)
-     */
+
     public function store(Request $request)
     {
+        $user = JWTAuth::parseToken()->authenticate();
+
         $validated = $request->validate([
-            'student_id' => "required",
             'student_name' => 'required|string|max:255',
             'class_id' => 'required|integer|exists:classes,class_id',
             'gender' => 'nullable|string|max:10',
             'email' => 'nullable|email|max:255',
+            'parent_contact' => 'nullable|string',
             'class_id' => 'required|string|max:50'
         ]);
 
-        // $class = Classes::where('class_id', $request->class_id)
-        //                 ->where('user_id', Auth::id())
-        //                 ->first();
-
-        // if (!$class) {
-        //     return response()->json([
-        //         'message' => 'You are not allowed to add students to this class.'
-        //     ], Response::HTTP_FORBIDDEN);
-        // }
-
-        // $student = StudentList::create([
-        //     'student_name' => $request->student_name,
-        //     'class_id' => $request->class_id,
-        // ]);
+        $class = Classes::where('class_id', $validated['class_id'])->where('user_id', $user->id)->first();
+        if (!$class) {
+            return response()->json([
+                "message" => "you can't create studetn on this class"
+            ],404);
+        }
         $student = StudentList::create($validated);
-
         return response()->json([
             'message' => 'Student added successfully.',
             'data' => $student
         ], Response::HTTP_CREATED);
     }
 
-    /**
-     * Show a student by ID with class & attendance summary
-     */
+   
     public function show($student_id)
     {
         $student = StudentList::with(['classes', 'attendanceSummary'])
-                              ->where('student_id', $student_id)
-                              ->first();
+            ->where('student_id', $student_id)
+            ->first();
 
         if (!$student) {
             return response()->json(['message' => 'Student not found'], Response::HTTP_NOT_FOUND);
@@ -123,8 +104,8 @@ class StudentListController extends Controller
 
         // Check if class belongs to logged-in teacher
         $class = Classes::where('class_id', $student->class_id)
-                        ->where('user_id', $request->user()->id)
-                        ->first();
+            ->where('user_id', $request->user()->id)
+            ->first();
 
         if (!$class) {
             return response()->json([
@@ -136,6 +117,7 @@ class StudentListController extends Controller
             'student_name' => 'sometimes|required|string|max:255',
             'gender' => 'nullable|string|max:10',
             'email' => 'nullable|email|max:255',
+            'parent_contact' => 'nullable|string',
             'class_id' => 'required|string|max:50'
         ]);
 
@@ -160,8 +142,8 @@ class StudentListController extends Controller
 
         // Check class ownership
         $class = Classes::where('class_id', $student->class_id)
-                        ->where('user_id', $request->user()->id)
-                        ->first();
+            ->where('user_id', $request->user()->id)
+            ->first();
 
         if (!$class) {
             return response()->json([

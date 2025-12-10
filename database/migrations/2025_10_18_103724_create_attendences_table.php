@@ -19,7 +19,7 @@ return new class extends Migration
                   ->on('student_lists')
                   ->onDelete('cascade');
             $table->date('date');
-            $table->enum('status',['Present','Absent','Late'])->default('Present');
+            $table->enum('status',['Present','Absent','P'])->default('Present');
             $table->timestamps();
 
         });

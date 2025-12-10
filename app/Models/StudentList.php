@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Http\Controllers\AttendenceController;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class StudentList extends Model
 {
@@ -12,37 +13,42 @@ class StudentList extends Model
 
     protected $table = 'student_lists';
     protected $primaryKey = 'student_id';
-    public $incrementing = false;
+    public $incrementing = false; // because it's string
     protected $keyType = 'string';
-    protected $fillable = ['student_id', 'student_name', 'gender', 'email', 'class_id'];
+    protected $fillable = ['student_id', 'student_name', 'gender', 'email','parent_contact', 'class_id'];
 
-    // Relationship: Each student belongs to one class
+    // Relationship
     public function classes()
     {
         return $this->belongsTo(Classes::class, 'class_id');
     }
-    // public function attendance()
-    // {
-    //     return $this->attendences()
-    //         ->selectRaw('student_id, 
-    //                          SUM(status = "Present") as total_present,
-    //                          SUM(status = "Absent") as total_absent,
-    //                          SUM(status = "Late") as total_late')
-    //         ->groupBy('student_id');
-    // }
 
     public function attendance()
-{
-    return $this->hasMany(Attendence::class, 'student_id', 'student_id');
-}
-
+    {
+        return $this->hasMany(Attendence::class, 'student_id', 'student_id');
+    }
 
     public function attendanceSummary()
-{
-    return $this->attendance()
-                ->selectRaw('student_id, status, COUNT(*) as total')
-                ->groupBy('student_id', 'status');
-}
+    {
+        return $this->attendance()
+            ->selectRaw('student_id, status, COUNT(*) as total')
+            ->groupBy('student_id', 'status');
+    }
 
+    // Auto-generate student_id as string
+    protected static function booted()
+    {
+        static::creating(function ($student) {
+            if (!$student->student_id) {
+                DB::transaction(function () use ($student) {
+                    // get max numeric value of student_id
+                    $maxId = DB::table('student_lists')
+                        ->select(DB::raw('MAX(CAST(student_id AS INTEGER)) as max_id'))
+                        ->value('max_id');
 
+                    $student->student_id = $maxId ? (string)($maxId + 1) : '1';
+                });
+            }
+        });
+    }
 }

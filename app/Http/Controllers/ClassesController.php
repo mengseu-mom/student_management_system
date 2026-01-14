@@ -25,6 +25,9 @@ class ClassesController extends Controller
         $validated = $request->validate([
             "class_id" => "required|string|max:25|unique:classes,class_id",
             "class_name" => "required|string|max:50",
+            "teach_days" => "required|json",
+            "start_hour" => "required|time",
+            "end_hour" => "required|time",
             "status" => "required|boolean",
         ]);
 
@@ -52,7 +55,7 @@ class ClassesController extends Controller
     public function getByClass($class_id)
 {
     $userId = auth('api')->id();
-    // 1. Check if class exists AND belongs to this user
+    // Check if class exists AND belongs to this user
     $class = Classes::where('class_id', $class_id)
         ->where('user_id', $userId)
         ->with('students')
@@ -71,7 +74,7 @@ class ClassesController extends Controller
             "class_id" => $class->class_id,
             "class_name" => $class->class_name,
         ],
-        "students" => $class->students   // can be empty []
+        "students" => $class->students 
     ], 200);
 }
 
@@ -82,15 +85,15 @@ class ClassesController extends Controller
      */
     public function update(Request $request, string $class_id)
     {
-        $classes = Classes::find($class_id);
-
+        $user = JWTAuth::parseToken()->authenticate();
+        $classes = Classes::where('user_id',$user->id)->find($class_id);
         if (!$classes) {
             return response()->json(['message' => 'Class not found'], 404);
         }
 
         $validated = $request->validate([
             "class_name" => "sometimes|string|max:50",
-            "user_id" => "sometimes|exists:users,id"
+            "status" => "required|boolean"
         ]);
 
         $classes->update($validated);

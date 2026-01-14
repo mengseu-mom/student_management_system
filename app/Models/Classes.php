@@ -18,6 +18,8 @@ class Classes extends Model
     protected $fillable = [
         'class_id',
         'class_name',
+        'teach_days',
+        'teach_hour',
         'status',
         'user_id', 
     ];

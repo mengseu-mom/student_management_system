@@ -6,16 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
+    
     public function up(): void
     {
         Schema::create('classes', function (Blueprint $table) {
-            $table->string('class_id')->primary(); // make it primary instead of unique
+            $table->string('class_id')->primary(); 
             $table->string('class_name')->nullable();
+            $table->json('teach_days');
+            $table->time('start_hour');
+            $table->time('end_hour');
             $table->boolean('status');
-            $table->unsignedBigInteger('user_id'); // foreign key to users table
+            $table->unsignedBigInteger('user_id'); 
             $table->timestamps();
 
             // add foreign key constraint
@@ -23,9 +24,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('classes');

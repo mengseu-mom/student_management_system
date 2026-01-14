@@ -74,26 +74,7 @@ class StudentListController extends Controller
         ], Response::HTTP_CREATED);
     }
 
-   
-    public function show($student_id)
-    {
-        $student = StudentList::with(['classes', 'attendanceSummary'])
-            ->where('student_id', $student_id)
-            ->first();
 
-        if (!$student) {
-            return response()->json(['message' => 'Student not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => $student
-        ], Response::HTTP_OK);
-    }
-
-    /**
-     * Update a student (teacher can only update their own class students)
-     */
     public function update(Request $request, $student_id)
     {
         $student = StudentList::find($student_id);
@@ -129,9 +110,6 @@ class StudentListController extends Controller
         ], Response::HTTP_OK);
     }
 
-    /**
-     * Delete a student (teacher can only delete their own class students)
-     */
     public function destroy(Request $request, $student_id)
     {
         $student = StudentList::find($student_id);
